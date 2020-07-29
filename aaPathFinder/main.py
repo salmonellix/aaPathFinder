@@ -28,7 +28,7 @@ def getKeysByValue(dict_elements, value_find):
             keys_list.append(item[0])
     return  keys_list[0]
 
-def getCenterPoint(center):
+def getCenterPoint(center, pdb_atoms):
     as_points = []
     y_sum = 0
     x_sum = 0
@@ -37,8 +37,20 @@ def getCenterPoint(center):
     for j in center['res']:
         as_point = int(j)
         as_coords = pdb_atoms[pdb_atoms['residue_number'] == as_point]
-        as_coords = as_coords[as_coords["atom_name"] == "CA"]
-        nbr = int(as_coords["atom_number"] - 1)
+        try:
+            as_coords = as_coords[as_coords["atom_name"] == "CA"]
+            print('try')
+            print(as_coords)
+            nbr = int(as_coords["atom_number"]) - 1
+        except:
+            try:
+                as_coords = as_coords[as_coords["atom_name"] == "CA"]
+                as_coords = as_coords[as_coords["alt_loc"] == "A"]
+                print(as_coords)
+                nbr = int(as_coords["atom_number"]) - 1
+            except:
+               print('Bad input structure')
+
         as_points.append(as_coords)
         x_sum = x_sum + as_coords["x_coord"][nbr]
         y_sum = y_sum + as_coords["y_coord"][nbr]
@@ -64,7 +76,7 @@ def getPathToSurface(center, surface_nbr, sur_try):
     surf_coords = np.array((first_coords["x_coord"][nbr], first_coords["y_coord"][nbr], first_coords["z_coord"][nbr]),
                            dtype=float)
     distance = np.linalg.norm(center - surf_coords)
-    target_atom = structure['A'][1]
+
     x_dif = (center[0] - first_coords["x_coord"])[nbr] / (distance * 2)
     y_dif = (center[1] - first_coords["y_coord"])[nbr] / (distance * 2)
     z_dif = (center[2] - first_coords["z_coord"])[nbr] / (distance * 2)
@@ -106,7 +118,7 @@ def getPathToSurface(center, surface_nbr, sur_try):
 
 all_path = pdb_path+ pdb_name + '.pdb'
 pdb_try = PandasPdb().read_pdb(full_path)
-sur_try = pd.read_fwf(str(surface_path))
+sur_try = pd.read_csv(str(surface_path), delimiter=r"\s+")
 sur_try = sur_try.dropna()
 center = pd.read_fwf(str(center_path))
 pdb_atoms = pdb_try.df["ATOM"]
@@ -116,9 +128,11 @@ structure = structures[0]
 atoms  = Bio.PDB.Selection.unfold_entities(structure, 'A')
 ns = Bio.PDB.NeighborSearch(atoms)
 
-new_center = getCenterPoint(center)
+new_center = getCenterPoint(center, pdb_atoms)
 
 df_all = pd.DataFrame(columns=['aa_surface', 'pymol sele'])
+
+print(sur_try.columns)
 for n in range(0,len(sur_try['res'])):
     line_pymol = getPathToSurface(new_center, n, sur_try)
     df_all.loc[n] = [sur_try['res'][n]] + [line_pymol]
